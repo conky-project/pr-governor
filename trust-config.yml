@@ -1,0 +1,82 @@
+scoring:
+  # Bucket size for burst-prevention and consistency counting (days).
+  # Multiple PRs within one window receive log-diminishing extra credit
+  # rather than a full per-PR bonus.
+  window_size_days: 30
+  # Maximum number of merged PRs to fetch.  Fetches the most recent PRs first.
+  # 0 fetches all history (may be slow and hit secondary rate limits on large repos).
+  max_prs: 500
+
+# Per-feature configuration.
+#
+# full_credit_at: what value of this feature earns a normalized score of 1.0.
+#   Accepts a literal number (in the feature's natural unit) or a percentile
+#   string like "p99" to use the observed 99-th percentile across all
+#   contributors.
+#   Any value above the cap is clamped to 1.0.
+#
+# importance: relative weight in the final score.
+#   Values are auto-normalized: setting all features to 1 gives equal weight;
+#   setting recency to 2 and the rest to 1 means recency counts twice as much.
+#   The actual formula is: score = 2 * weighted_mean(normalized_features) - 1
+#
+features:
+  recency:
+    # Burst-protected exponential decay sum of past PR activity.
+    # half_life_days: contributions older than this lose ~50% weight.
+    #   Also controls the decay rate for review_activity.
+    half_life_days: 2y        # ~2 years; accepts 730, "2y", "24mo", "730d"
+    # burst_bonus: extra credit coefficient for multiple PRs in one window.
+    # Formula: max(decay) * (1 + burst_bonus * log1p(n - 1))
+    burst_bonus: 0.1
+    # inactivity_cutoff: contributors with no activity (PR or review) beyond
+    # this threshold have their final score overridden to -1.
+    inactivity_cutoff: 2y
+    full_credit_at: p99       # data-driven: p99 contributor's recency = 1.0
+    importance: 2
+
+  review_activity:
+    # Recency-decayed sum of reviews given on merged PRs.  Uses the same
+    # half_life_days as recency.  A contributor who participates exclusively
+    # through review can qualify for the trusted team without authoring PRs.
+    full_credit_at: p99
+    importance: 2
+
+  engagement:
+    # Pairwise activity sum: for each pair of active windows (i < j),
+    # adds min(c_i, c_j) * log1p(gap_months), where
+    # c_i = min(prs_in_window / full_credit_window_prs, 1.0).
+    # Rewards both breadth (long history) and depth (active on both ends).
+    full_credit_window_prs: 5 # PRs per window counted as "fully active"
+    full_credit_at: p99       # data-driven: p99 contributor's engagement = 1.0
+    importance: 3             # replaces consistency (2) + spread (1)
+
+  volume:
+    # Total merged PR count.
+    full_credit_at: 20        # 20+ merged PRs = full credit
+    importance: 1
+
+  diff_size:
+    # Median lines changed per PR.
+    full_credit_at: 300       # PRs averaging 300+ lines = full credit
+    importance: 1
+
+# Logins excluded from contributor scoring.
+# Supports fnmatch glob patterns: "*[bot]", "bot-*", "*-ci-*", etc.
+# Override in your repo's trust-config.yml to add project-specific automation
+# (e.g. bors, renovate). Note: overriding replaces this list entirely.
+ignore_users:
+  - "*[bot]"
+  - dependabot
+
+thresholds:
+  # Minimum score on the [-1, 1] scale to qualify for team membership.
+  # 0.0 means "above the midpoint between zero and the p99 contributor".
+  # Tune this after running the cron job and inspecting the score distribution.
+  trusted_approver: 0.0
+
+# GitHub org that owns the trusted-contributors team, in "org" or "org/team-slug"
+# format. The team is created automatically if it does not exist. Must be an
+# organization account (not a personal account) to support Teams.
+# Required - must be set in your repo's trust-config.yml.
+github: ""

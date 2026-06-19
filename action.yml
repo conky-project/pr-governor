@@ -1,0 +1,11 @@
+name: 'PR Governor: Stub'
+description: "PR Governor: Don't use this action directly. See the official documentation for sub-action details."
+author: 'GitHub'
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Stub'
+      run: |
+        echo 'This is a stub. See the official documentation for sub-action details.'
+        exit 1
+      shell: bash

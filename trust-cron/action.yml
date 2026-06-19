@@ -1,0 +1,32 @@
+name: Update Trusted Contributors
+description: >
+  Recomputes per-contributor trust scores from merged PR history and syncs
+  the trusted-contributors GitHub team membership via the Teams API.
+  Nothing is committed to the repository - state lives entirely in GitHub.
+
+inputs:
+  org-token:
+    description: PAT with write:org scope for managing team membership
+    required: true
+  config:
+    description: Path to trust-config.yml relative to the calling repo root
+    required: false
+    default: .github/trust-config.yml
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      with:
+        python-version: "3.12"
+
+    - name: Compute trust scores and sync team membership
+      run: >
+        uv run --frozen
+        --project "${{ github.action_path }}/.."
+        python "${{ github.action_path }}/../scripts/trust_score.py"
+      shell: bash
+      env:
+        ORG_TOKEN: ${{ inputs.org-token }}
+        TRUST_CONFIG: ${{ inputs.config }}
+        GITHUB_REPOSITORY: ${{ github.repository }}

@@ -1,0 +1,48 @@
+name: PR Guard
+description: >
+  Dismisses approved reviews when a new commit author appears in the PR after
+  reviews were given, or when a force push rewrites history.  Automatically
+  enables required commit signatures on the head branch when the PR author uses
+  GPG-verified commits - unsigned pushes are then rejected server-side by GitHub.
+  Accepts "/allow-unsigned" in a PR comment from the PR author or a repo owner
+  to remove the lock and dismiss all existing approvals.
+  Requires pull-requests:write and administration:write on the calling workflow.
+
+inputs:
+  pr-number:
+    description: Pull request number (required for synchronize events, ignored for comments)
+    required: false
+  before-sha:
+    description: Head SHA before this push - github.event.before (synchronize only)
+    required: false
+  after-sha:
+    description: Head SHA after this push - github.event.pull_request.head.sha (synchronize only)
+    required: false
+  org-token:
+    description: >
+      PAT with read:org scope, used to resolve organisation owners for the
+      /allow-unsigned authorisation check.  Falls back to the workflow token
+      if omitted (sufficient for personal-account repos).
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      with:
+        python-version: "3.12"
+
+    - name: Guard PR
+      run: >
+        uv run --frozen
+        --project "${{ github.action_path }}/.."
+        python "${{ github.action_path }}/../scripts/pr_guard.py"
+      shell: bash
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+        BEFORE_SHA: ${{ inputs.before-sha }}
+        AFTER_SHA: ${{ inputs.after-sha }}
+        ORG_TOKEN: ${{ inputs.org-token }}
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}

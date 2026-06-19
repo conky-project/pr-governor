@@ -1,0 +1,40 @@
+name: PR Approval Check
+description: >
+  Validates PR approval integrity: enforces no self-approval and requires at
+  least one approval from a member of the trusted-contributors GitHub team.
+  Posts a commit status (pr-governance/approval-check) on the PR head SHA.
+
+inputs:
+  org-token:
+    description: PAT with read:org scope for querying team membership
+    required: true
+  pr-number:
+    description: Pull request number
+    required: true
+  head-sha:
+    description: PR head SHA to post the commit status against
+    required: true
+  config:
+    description: Path to trust-config.yml relative to the calling repo root
+    required: false
+    default: .github/trust-config.yml
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      with:
+        python-version: "3.12"
+
+    - name: Check approval integrity
+      run: >
+        uv run --frozen
+        --project "${{ github.action_path }}/.."
+        python "${{ github.action_path }}/../scripts/check_approvals.py"
+      shell: bash
+      env:
+        ORG_TOKEN: ${{ inputs.org-token }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        HEAD_SHA: ${{ inputs.head-sha }}
+        TRUST_CONFIG: ${{ inputs.config }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
